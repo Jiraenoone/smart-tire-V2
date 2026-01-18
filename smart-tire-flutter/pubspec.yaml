@@ -1,0 +1,44 @@
+name: smart_tire
+description: Smart Tire Health Monitoring App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # MongoDB
+  mongo_dart: ^0.10.5
+  
+  # Device ID for guest account
+  device_info_plus: ^10.0.0
+  
+  # Image handling
+  image_picker: ^1.0.7
+  
+  # State management
+  provider: ^6.1.1
+  
+  # Local storage
+  shared_preferences: ^2.2.2
+  
+  # HTTP for API calls
+  http: ^1.2.0
+  
+  # UUID generation
+  uuid: ^4.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/examples/
