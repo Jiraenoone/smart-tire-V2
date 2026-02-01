@@ -368,22 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getPositionText(String position) {
-    switch (position) {
-      case 'FL':
-        return 'หน้าซ้าย';
-      case 'FR':
-        return 'หน้าขวา';
-      case 'RL':
-        return 'หลังซ้าย';
-      case 'RR':
-        return 'หลังขวา';
-      case 'SPARE':
-        return 'อะไหล่';
-      default:
-        return position;
-    }
-  }
+ 
 
   Color _getHealthColor(int percentage) {
     if (percentage >= 70) {
