@@ -31,7 +31,7 @@ dependencies:
   uuid: ^4.3.3
 
   #flash
-git  camera: ^0.11.0+2
+  camera: ^0.11.0+2
 
 dev_dependencies:
   flutter_test:
