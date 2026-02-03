@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_tire/services/notification_repository.dart';
 import '../providers/app_state.dart';
+
 
 // ตัวจัดการการสลับล้อ (รองรับ preview ยางที่ 2 และ confirm)
 class TireSwapManager {
@@ -103,6 +105,13 @@ class TireSwapManager {
     messenger.showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
+
+    final repo = NotificationRepository();
+    repo.addNotification(
+    "สลับยางเสร็จสิ้น",
+    "คุณได้สลับยางเรียบร้อยแล้ว",
+  );
+
   }
 
   // แปลงรหัสตำแหน่งล้อเป็นข้อความไทย

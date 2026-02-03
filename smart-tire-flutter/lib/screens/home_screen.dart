@@ -1,77 +1,97 @@
-import 'package:flutter/material.dart'; // นำเข้า Flutter UI หลัก
-import 'package:provider/provider.dart'; // นำเข้า Provider สำหรับ state management
-import '../providers/app_state.dart'; // นำเข้า AppState ที่เก็บข้อมูลรถและยาง
-import '../models/tire_data.dart'; // โมเดลข้อมูลยาง (healthPercentage, treadDepth ฯลฯ)
-import '../models/vehicle.dart'; // โมเดลข้อมูลรถ (เก็บแผนที่ตำแหน่งยาง)
-import '../services/swap_tire.dart'; // นำเข้า TireSwapManager สำหรับ logic การสลับยาง
-import 'tire_detail_screen.dart'; // หน้ารายละเอียดยาง (เปิดเมื่อแตะยางที่มีข้อมูล)
-import 'add_tire_screen.dart'; // หน้าเพิ่มยางใหม่ (เปิดเมื่อแตะยางว่าง)
+// lib/screens/home_screen.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// ประกาศ StatefulWidget สำหรับหน้าหลักของแอป
+import '../providers/app_state.dart';
+import '../models/tire_data.dart';
+import '../models/vehicle.dart';
+import '../services/swap_tire.dart';
+import '../services/notification_repository.dart';
+import 'tire_detail_screen.dart';
+import 'add_tire_screen.dart';
+import 'notification_screen.dart'; // ต้องมีไฟล์นี้ (ดูไฟล์ด้านล่าง)
+
+/// HomeScreen
+/// - แสดงโครงรถและตำแหน่งยาง
+/// - มีปุ่มสลับยาง (swap mode)
+/// - มีปุ่มเปิด NotificationScreen เพื่อดูรายการแจ้งเตือนภายในแอป
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key); // คอนสตรัคเตอร์ของ widget
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState(); // สร้าง state ของ widget
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// State ของ HomeScreen
 class _HomeScreenState extends State<HomeScreen> {
-  late TireSwapManager _swapManager; // ตัวจัดการโหมดสลับและสถานะการเลือกยาง
+  late TireSwapManager _swapManager;
 
   @override
   void initState() {
-    super.initState(); // เรียก init ของ superclass
-    _swapManager = TireSwapManager(); // สร้าง instance ของ TireSwapManager
+    super.initState();
+    _swapManager = TireSwapManager();
   }
 
   @override
   Widget build(BuildContext context) {
-    // ใช้ Consumer เพื่อฟังการเปลี่ยนแปลงของ AppState (รถและยาง)
     return Consumer<AppState>(
       builder: (context, appState, child) {
-        final vehicle = appState.currentVehicle; // ดึงรถปัจจุบันจาก AppState
+        final vehicle = appState.currentVehicle;
 
-        // ถ้าไม่มีรถ ให้แสดงข้อความแจ้งผู้ใช้
+        // Safety: ถ้าไม่มีรถ ให้แสดงข้อความ
         if (vehicle == null) {
           return const Scaffold(
-            body: Center(child: Text('ไม่พบข้อมูลรถ')), // ข้อความเมื่อไม่มีข้อมูลรถ
+            body: Center(child: Text('ไม่พบข้อมูลรถ')),
           );
         }
 
-        // ถ้ามีรถ ให้แสดง UI หลัก
+        // NotificationRepository มาจาก AppState (repo ถูกสร้างใน AppState)
+        final NotificationRepository repo = appState.repo;
+
         return Scaffold(
           appBar: AppBar(
-            // ชื่อรถเป็นปุ่มแตะเพื่อแก้ไขชื่อ
             title: GestureDetector(
-              onTap: () => _showEditVehicleNameDialog(context, appState), // เปิด dialog แก้ไขชื่อ
+              onTap: () => _showEditVehicleNameDialog(context, appState),
               child: Row(
-                mainAxisSize: MainAxisSize.min, // ขนาดแถวพอดีกับเนื้อหา
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(vehicle.name), // แสดงชื่อรถ
-                  const SizedBox(width: 8), // เว้นระยะระหว่างชื่อกับไอคอน
-                  const Icon(Icons.edit, size: 18), // ไอคอนแก้ไข
+                  Text(vehicle.name),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.edit, size: 18),
                 ],
               ),
             ),
             actions: [
+              // ปุ่มดูการแจ้งเตือนในแอป (เปิด NotificationScreen)
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificationScreen(repo: repo),
+                    ),
+                  );
+                },
+              ),
+
               // ถ้ามีหลายคัน ให้แสดงเมนูเลือกคัน
               if (appState.vehicles.length > 1)
                 PopupMenuButton<int>(
-                  icon: const Icon(Icons.directions_car), // ไอคอนเมนูรถ
-                  onSelected: (index) => appState.setCurrentVehicleIndex(index), // เปลี่ยนรถปัจจุบัน
+                  icon: const Icon(Icons.directions_car),
+                  onSelected: (index) => appState.setCurrentVehicleIndex(index),
                   itemBuilder: (context) => List.generate(
-                    appState.vehicles.length, // จำนวนรายการเท่าจำนวนรถ
+                    appState.vehicles.length,
                     (index) => PopupMenuItem(
-                      value: index, // ค่าที่ส่งกลับเมื่อเลือก
-                      child: Text(appState.vehicles[index].name), // ชื่อรถแต่ละคัน
+                      value: index,
+                      child: Text(appState.vehicles[index].name),
                     ),
                   ),
                 ),
+
               // ปุ่มเพิ่มรถใหม่
               IconButton(
-                icon: const Icon(Icons.add_circle_outline), // ไอคอนเพิ่ม
-                onPressed: () => _showAddVehicleDialog(context, appState), // เปิด dialog เพิ่มรถ
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () => _showAddVehicleDialog(context, appState),
               ),
             ],
           ),
@@ -79,33 +99,32 @@ class _HomeScreenState extends State<HomeScreen> {
           // เนื้อหา: โครงรถ + ยาง + ปุ่มสลับยาง
           body: Stack(
             children: [
-              _buildVehicleView(vehicle), // วาดโครงรถและตำแหน่งยางทั้งหมด
+              _buildVehicleView(vehicle, appState),
               Positioned(
-                bottom: 20, // ระยะจากล่าง
-                right: 20, // ระยะจากขวา
+                bottom: 20,
+                right: 20,
                 child: FloatingActionButton.extended(
                   onPressed: () {
-                    // สลับโหมดสลับยาง (เปิด/ปิด)
                     setState(() {
                       _swapManager.toggleSwapMode();
                     });
 
-                    // แสดงหรือซ่อน SnackBar แนะนำการใช้งาน
                     if (!_swapManager.isSwappingMode) {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar(); // ซ่อน SnackBar
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('เลือกยางที่ 1 ที่ต้องการสลับ'), // ข้อความแนะนำ
-                          duration: Duration(seconds: 2), // ระยะเวลาแสดง
+                          content: Text('เลือกยางที่ 1 ที่ต้องการสลับ'),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     }
                   },
-                  backgroundColor: _swapManager.isSwappingMode ? Colors.red : const Color(0xFFFFD700), // สีปุ่มตามโหมด
-                  foregroundColor: _swapManager.isSwappingMode ? Colors.white : Colors.black, // สีไอคอน/ข้อความ
-                  icon: Icon(_swapManager.isSwappingMode ? Icons.close : Icons.swap_horiz), // ไอคอนเปลี่ยนตามโหมด
-                  label: Text(_swapManager.isSwappingMode ? 'ยกเลิก' : 'สลับยาง'), // ข้อความบนปุ่ม
+                  backgroundColor:
+                      _swapManager.isSwappingMode ? Colors.red : const Color(0xFFFFD700),
+                  foregroundColor: _swapManager.isSwappingMode ? Colors.white : Colors.black,
+                  icon: Icon(_swapManager.isSwappingMode ? Icons.close : Icons.swap_horiz),
+                  label: Text(_swapManager.isSwappingMode ? 'ยกเลิก' : 'สลับยาง'),
                 ),
               ),
             ],
@@ -115,123 +134,115 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// วาดโครงรถและตำแหน่งยางทั้ง 5 ตำแหน่ง (FL, FR, RL, RR, SPARE)
-  Widget _buildVehicleView(Vehicle vehicle) {
+  Widget _buildVehicleView(Vehicle vehicle, AppState appState) {
     return Scaffold(
-      backgroundColor: const Color(0xFF252525), // พื้นหลังสีเข้ม
+      backgroundColor: const Color(0xFF252525),
       body: Center(
         child: SizedBox(
-          width: 350, // ความกว้างคงที่ของโครง
-          height: 650, // ความสูงคงที่ของโครง
+          width: 350,
+          height: 650,
           child: Stack(
-            alignment: Alignment.center, // จัดตำแหน่งลูกให้ตรงกลาง
+            alignment: Alignment.center,
             children: [
-              // โครงรถแนวตั้ง (ตัวถัง)
               Container(
-                width: 40, // ความกว้างตัวถัง
-                height: 350, // ความสูงตัวถัง
+                width: 40,
+                height: 350,
                 decoration: BoxDecoration(
-                  color: Colors.black, // สีตัวถัง
-                  borderRadius: BorderRadius.circular(20), // มุมโค้ง
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
-
-              // เพลาหน้า (ตำแหน่งแนวนอน)
               Positioned(
-                top: 130, // ระยะจากบน
+                top: 130,
                 child: Container(
-                  width: 240, // ความกว้างเพลา
-                  height: 35, // ความสูงเพลา
+                  width: 240,
+                  height: 35,
                   decoration: BoxDecoration(
-                    color: Colors.black, // สีเพลา
-                    borderRadius: BorderRadius.circular(10), // มุมโค้ง
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
-
-              // เพลาหลัง
               Positioned(
-                bottom: 180, // ระยะจากล่าง
+                bottom: 180,
                 child: Container(
-                  width: 240, // ความกว้างเพลา
-                  height: 35, // ความสูงเพลา
+                  width: 240,
+                  height: 35,
                   decoration: BoxDecoration(
-                    color: Colors.black, // สีเพลา
-                    borderRadius: BorderRadius.circular(10), // มุมโค้ง
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
-
-              // เฟืองกลาง (แสดงเป็นวงกลมตรงกลาง)
               Container(
-                width: 70, // ความกว้างเฟือง
-                height: 100, // ความสูงเฟือง
+                width: 70,
+                height: 100,
                 decoration: BoxDecoration(
-                  color: Colors.black, // สีเฟือง
-                  borderRadius: BorderRadius.circular(35), // มุมโค้งกลม
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(35),
                 ),
               ),
 
-              // Front Left (FL)
+              // FL
               Positioned(
-                top: 60, // ระยะจากบน
-                left: 20, // ระยะจากซ้าย
+                top: 60,
+                left: 20,
                 child: Column(
                   children: [
-                    _buildTireWidgetCompact('FL', vehicle.tires['FL']), // วาดยางตำแหน่ง FL
-                    const SizedBox(height: 8), // เว้นระยะ
-                    const Text('หน้าซ้าย', style: TextStyle(color: Colors.white70, fontSize: 12)), // ป้ายตำแหน่ง
+                    _buildTireWidgetCompact('FL', vehicle.tires['FL']),
+                    const SizedBox(height: 8),
+                    const Text('หน้าซ้าย', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
 
-              // Front Right (FR)
+              // FR
               Positioned(
-                top: 60, // ระยะจากบน
-                right: 20, // ระยะจากขวา
+                top: 60,
+                right: 20,
                 child: Column(
                   children: [
-                    _buildTireWidgetCompact('FR', vehicle.tires['FR']), // วาดยางตำแหน่ง FR
-                    const SizedBox(height: 8), // เว้นระยะ
-                    const Text('หน้าขวา', style: TextStyle(color: Colors.white70, fontSize: 12)), // ป้ายตำแหน่ง
+                    _buildTireWidgetCompact('FR', vehicle.tires['FR']),
+                    const SizedBox(height: 8),
+                    const Text('หน้าขวา', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
 
-              // Rear Left (RL)
+              // RL
               Positioned(
-                bottom: 100, // ระยะจากล่าง
-                left: 20, // ระยะจากซ้าย
+                bottom: 100,
+                left: 20,
                 child: Column(
                   children: [
-                    _buildTireWidgetCompact('RL', vehicle.tires['RL']), // วาดยางตำแหน่ง RL
-                    const SizedBox(height: 8), // เว้นระยะ
-                    const Text('หลังซ้าย', style: TextStyle(color: Colors.white70, fontSize: 12)), // ป้ายตำแหน่ง
+                    _buildTireWidgetCompact('RL', vehicle.tires['RL']),
+                    const SizedBox(height: 8),
+                    const Text('หลังซ้าย', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
 
-              // Rear Right (RR)
+              // RR
               Positioned(
-                bottom: 100, // ระยะจากล่าง
-                right: 20, // ระยะจากขวา
+                bottom: 100,
+                right: 20,
                 child: Column(
                   children: [
-                    _buildTireWidgetCompact('RR', vehicle.tires['RR']), // วาดยางตำแหน่ง RR
-                    const SizedBox(height: 8), // เว้นระยะ
-                    const Text('หลังขวา', style: TextStyle(color: Colors.white70, fontSize: 12)), // ป้ายตำแหน่ง
+                    _buildTireWidgetCompact('RR', vehicle.tires['RR']),
+                    const SizedBox(height: 8),
+                    const Text('หลังขวา', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
 
-              // Spare (ยางอะไหล่)
+              // SPARE
               Positioned(
-                bottom: 10, // ระยะจากล่าง
+                bottom: 10,
                 child: Column(
                   children: [
-                    _buildTireWidgetCompact('SPARE', vehicle.tires['SPARE'], isHorizontal: true), // วาดยางอะไหล่
-                    const SizedBox(height: 8), // เว้นระยะ
-                    const Text('อะไหล่', style: TextStyle(color: Colors.white70, fontSize: 12)), // ป้ายตำแหน่ง
+                    _buildTireWidgetCompact('SPARE', vehicle.tires['SPARE'], isHorizontal: true),
+                    const SizedBox(height: 8),
+                    const Text('อะไหล่', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
@@ -242,198 +253,181 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Widget แสดงยางแบบ compact
-  /// - ถ้าอยู่ในโหมดสลับ: แตะครั้งแรกเป็นยางที่ 1, แตะครั้งที่สองเป็นยางที่ 2 (preview) แล้วแสดง dialog ยืนยัน
-  /// - ถ้าไม่ใช่โหมดสลับ: แตะเปิดหน้า detail หรือหน้าเพิ่มยาง
   Widget _buildTireWidgetCompact(String position, TireData? tireData, {bool isHorizontal = false}) {
-    // ตรวจสถานะการเลือกจาก manager
-    final bool isFirst = _swapManager.isFirstTireSelected(position); // true ถ้าเป็นยางที่ 1
-    final bool isSecond = _swapManager.isSecondTireSelected(position); // true ถ้าเป็นยางที่ 2 (preview)
+    final bool isFirst = _swapManager.isFirstTireSelected(position);
+    final bool isSecond = _swapManager.isSecondTireSelected(position);
 
     return GestureDetector(
       onTap: () {
         if (_swapManager.isSwappingMode) {
-          // ถ้ายังไม่มียางแรก ให้ตั้งเป็นยางแรก
           if (_swapManager.selectedFirstTire == null) {
-            _swapManager.selectFirstTire(position); // เก็บตำแหน่งยางที่ 1
-            setState(() {}); // รีเฟรช UI ให้เห็นกรอบยางที่ 1
-            ScaffoldMessenger.of(context).clearSnackBars(); // เคลียร์ SnackBar เก่า
+            _swapManager.selectFirstTire(position);
+            setState(() {});
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('เลือกยางที่ 2 เพื่อสลับ'), duration: Duration(seconds: 2)),
-            ); // แจ้งให้เลือกยางที่ 2
-            return; // จบการทำงานของ onTap
+            );
+            return;
           }
 
-          // ถ้าแตะตำแหน่งเดียวกับยางแรก → แจ้งเตือนให้เลือกยางอื่น
           if (_swapManager.selectedFirstTire == position) {
-            ScaffoldMessenger.of(context).clearSnackBars(); // เคลียร์ SnackBar เก่า
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('คุณเลือกยางเดิม กรุณาเลือกอีกล้อหนึ่ง'), duration: Duration(seconds: 2)),
-            ); // แจ้งเตือน
-            return; // จบการทำงานของ onTap
+            );
+            return;
           }
 
-          // ถ้ามียางแรกแล้ว และแตะตำแหน่งต่างกัน → ตั้งเป็นยางที่สอง (preview) แล้วแสดง confirm dialog
-          _swapManager.selectSecondTire(position); // เก็บตำแหน่งยางที่ 2 (preview)
-          setState(() {}); // อัพเดต UI ให้เห็นทั้งสองยางถูกไฮไลท์
+          _swapManager.selectSecondTire(position);
+          setState(() {});
 
-          // แสดง dialog ยืนยันการสลับ
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('ยืนยันการสลับ'), // หัวข้อ dialog
-              content: Text(_swapManager.getSwapPreviewMessage()), // ข้อความ preview จาก manager
+              title: const Text('ยืนยันการสลับ'),
+              content: Text(_swapManager.getSwapPreviewMessage()),
               actions: [
                 TextButton(
                   onPressed: () {
-                    // ยกเลิกเฉพาะยางที่ 2 (เก็บยางที่ 1 ไว้)
-                    _swapManager.clearSecondTire(); // ล้างยางที่ 2
-                    setState(() {}); // รีเฟรช UI
-                    Navigator.pop(context); // ปิด dialog
+                    _swapManager.clearSecondTire();
+                    setState(() {});
+                    Navigator.pop(context);
                   },
-                  child: const Text('ยกเลิก'), // ปุ่มยกเลิก
+                  child: const Text('ยกเลิก'),
                 ),
                 TextButton(
                   onPressed: () {
-                    // ยืนยัน → ทำการสลับจริง
                     _swapManager.performSwapConfirmed(
                       context,
-                      context.read<AppState>(), // ส่ง AppState ให้ manager เพื่อสลับข้อมูล
+                      context.read<AppState>(),
                       () {
-                        setState(() {}); // รีเฟรช UI หลังสลับเสร็จ
+                        setState(() {});
                       },
                     );
-                    Navigator.pop(context); // ปิด dialog
+                    Navigator.pop(context);
                   },
-                  child: const Text('ยืนยัน'), // ปุ่มยืนยัน
+                  child: const Text('ยืนยัน'),
                 ),
               ],
             ),
           );
         } else {
-          // ไม่ใช่โหมดสลับ → เปิดหน้ารายละเอียดหรือหน้าเพิ่มยาง
           if (tireData != null) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => TireDetailScreen(position: position, tireData: tireData)),
-            ); // เปิดหน้ารายละเอียดยาง
+            );
           } else {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => AddTireScreen(position: position)),
-            ); // เปิดหน้าเพิ่มยาง
+            );
           }
         }
       },
-
-      // รูปทรงยาง: ขนาด, สีพื้น, ขอบ, เงา
       child: Container(
-        width: isHorizontal ? 120 : 80, // ขนาดกว้างตามแนวนอนหรือแนวตั้ง
-        height: isHorizontal ? 80 : 120, // ขนาดสูงตามแนวนอนหรือแนวตั้ง
+        width: isHorizontal ? 120 : 80,
+        height: isHorizontal ? 80 : 120,
         decoration: BoxDecoration(
-          // ไฮไลท์: ยางที่ 1 ใช้สีส้มเข้มกว่า ยางที่ 2 สีอ่อนกว่า
+          // แทน withOpacity (deprecated) ด้วย Color.fromRGBO เพื่อกำหนด alpha
           color: isFirst
-              ? Colors.orange.withValues(alpha: 0.22) // พื้นหลังอ่อนสำหรับยางที่ 1
-              : (isSecond ? Colors.orange.withValues(alpha: 0.12) // พื้นหลังอ่อนกว่าสำหรับยางที่ 2
-                  : (tireData != null ? _getHealthColor(tireData.healthPercentage) : Colors.white)), // ถ้าไม่มีข้อมูลใช้สีขาว
-          borderRadius: BorderRadius.circular(40), // มุมกลมของวงกลมยาง
+              ? const Color.fromRGBO(255, 165, 0, 0.22) // สีส้มอ่อนสำหรับยางที่ 1
+              : (isSecond
+                  ? const Color.fromRGBO(255, 165, 0, 0.12) // สีส้มอ่อนกว่าสำหรับยางที่ 2
+                  : (tireData != null ? _getHealthColor(tireData.healthPercentage) : Colors.white)),
+          borderRadius: BorderRadius.circular(40),
           border: Border.all(
             color: isFirst
-                ? Colors.orangeAccent // ขอบสีส้มสำหรับยางที่ 1
-                : (isSecond ? Colors.orange.shade200 // ขอบสีอ่อนสำหรับยางที่ 2
-                    : (tireData != null ? const Color(0xFFFFD700) : Colors.grey)), // ขอบปกติถ้ามียางหรือสีเทาถ้าว่าง
-            width: isFirst ? 4 : (isSecond ? 3 : 2), // ความหนาขอบตามสถานะ
+                ? Colors.orangeAccent
+                : (isSecond ? Colors.orange.shade200 : (tireData != null ? const Color(0xFFFFD700) : Colors.grey)),
+            width: isFirst ? 4 : (isSecond ? 3 : 2),
           ),
           boxShadow: [
-            // เงาใต้ยาง ใช้ withValues แทน withOpacity เพื่อหลีกเลี่ยง deprecation
-            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5)),
+            // แทน withOpacity ด้วย Color.fromRGBO alpha 0.3
+            BoxShadow(color: const Color.fromRGBO(0, 0, 0, 0.3), blurRadius: 10, offset: const Offset(0, 5)),
           ],
         ),
         child: Center(
-          // แสดงข้อมูลยางถ้ามี หรือไอคอนเพิ่มถ้าว่าง
           child: tireData != null
               ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center, // จัดแนวกลาง
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '${tireData.healthPercentage}%', // แสดงเปอร์เซ็นสุขภาพ
+                      '${tireData.healthPercentage}%',
                       style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      '${tireData.treadDepth.toStringAsFixed(1)} mm', // แสดงความลึกหน้ายาง
+                      '${tireData.treadDepth.toStringAsFixed(1)} mm',
                       style: const TextStyle(color: Colors.black87, fontSize: 10),
                     ),
                   ],
                 )
-              : const Icon(Icons.add, color: Color(0xFFFFD700), size: 40), // ไอคอนเพิ่มยาง
+              : const Icon(Icons.add, color: Color(0xFFFFD700), size: 40),
         ),
       ),
     );
   }
 
-  /// แปลงเปอร์เซ็นสุขภาพเป็นสี (ช่วยแสดงสถานะยาง)
   Color _getHealthColor(int percentage) {
-    if (percentage >= 70) return Colors.green.shade700; // สีเขียวถ้าสุขภาพดี
-    if (percentage >= 40) return Colors.orange.shade700; // สีส้มถ้ากลาง ๆ
-    return Colors.red.shade700; // สีแดงถ้าต่ำ
+    if (percentage >= 70) return Colors.green.shade700;
+    if (percentage >= 40) return Colors.orange.shade700;
+    return Colors.red.shade700;
   }
 
-  // Dialog แก้ไขชื่อรถ
   void _showEditVehicleNameDialog(BuildContext context, AppState appState) {
-    final controller = TextEditingController(text: appState.currentVehicle?.name); // เตรียม controller พร้อมชื่อเดิม
+    final controller = TextEditingController(text: appState.currentVehicle?.name);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A), // พื้นหลัง dialog
-        title: const Text('แก้ไขชื่อรถ', style: TextStyle(color: Color(0xFFFFD700))), // หัวข้อ
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: const Text('แก้ไขชื่อรถ', style: TextStyle(color: Color(0xFFFFD700))),
         content: TextField(
-          controller: controller, // ใช้ controller ที่เตรียมไว้
-          style: const TextStyle(color: Colors.white), // สีข้อความใน TextField
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'ชื่อรถ', // ข้อความแนะนำ
-            hintStyle: TextStyle(color: Colors.white54), // สีข้อความแนะนำ
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFD700))), // เส้นใต้สีทอง
+            hintText: 'ชื่อรถ',
+            hintStyle: TextStyle(color: Colors.white54),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFD700))),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))), // ปุ่มยกเลิก
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () {
-              appState.updateVehicleName(controller.text); // บันทึกชื่อใหม่ลง AppState
-              Navigator.pop(context); // ปิด dialog
+              appState.updateVehicleName(controller.text);
+              Navigator.pop(context);
             },
-            child: const Text('บันทึก', style: TextStyle(color: Color(0xFFFFD700))), // ปุ่มบันทึก
+            child: const Text('บันทึก', style: TextStyle(color: Color(0xFFFFD700))),
           ),
         ],
       ),
     );
   }
 
-  // Dialog เพิ่มรถใหม่
   void _showAddVehicleDialog(BuildContext context, AppState appState) {
-    final controller = TextEditingController(text: 'รถคันที่ ${appState.vehicles.length + 1}'); // ตั้งชื่อเริ่มต้น
+    final controller = TextEditingController(text: 'รถคันที่ ${appState.vehicles.length + 1}');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A), // พื้นหลัง dialog
-        title: const Text('เพิ่มรถใหม่', style: TextStyle(color: Color(0xFFFFD700))), // หัวข้อ
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: const Text('เพิ่มรถใหม่', style: TextStyle(color: Color(0xFFFFD700))),
         content: TextField(
-          controller: controller, // controller สำหรับชื่อรถใหม่
-          style: const TextStyle(color: Colors.white), // สีข้อความ
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'ชื่อรถ', // ข้อความแนะนำ
-            hintStyle: TextStyle(color: Colors.white54), // สีข้อความแนะนำ
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFD700))), // เส้นใต้สีทอง
+            hintText: 'ชื่อรถ',
+            hintStyle: TextStyle(color: Colors.white54),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFD700))),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))), // ปุ่มยกเลิก
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () {
-              appState.addNewVehicle(controller.text); // เพิ่มรถใหม่ลง AppState
-              Navigator.pop(context); // ปิด dialog
+              appState.addNewVehicle(controller.text);
+              Navigator.pop(context);
             },
-            child: const Text('เพิ่ม', style: TextStyle(color: Color(0xFFFFD700))), // ปุ่มเพิ่ม
+            child: const Text('เพิ่ม', style: TextStyle(color: Color(0xFFFFD700))),
           ),
         ],
       ),
