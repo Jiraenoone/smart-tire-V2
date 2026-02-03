@@ -6,6 +6,7 @@ import '../providers/app_state.dart';
 import '../models/tire_data.dart';
 import '../services/tire_api_service.dart';
 import 'package:uuid/uuid.dart';
+import 'camera_screen.dart';
 
 class AddTireScreen extends StatefulWidget {
   final String position;
@@ -362,15 +363,29 @@ class _AddTireScreenState extends State<AddTireScreen> {
   }
 
   Future<void> _pickImage(ImageSource source, bool isSidewall) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    File? imageFile;
 
-    if (pickedFile != null) {
+    if (source == ImageSource.camera) {
+      // ใช้กล้องแบบกำหนดเองที่มี flash
+      imageFile = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(builder: (context) => const CameraScreen()),
+      );
+    } else {
+      // ใช้ gallery ปกติ
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source);
+      if (pickedFile != null) {
+        imageFile = File(pickedFile.path);
+      }
+    }
+
+    if (imageFile != null) {
       setState(() {
         if (isSidewall) {
-          _sidewallImage = File(pickedFile.path);
+          _sidewallImage = imageFile;
         } else {
-          _treadImage = File(pickedFile.path);
+          _treadImage = imageFile;
         }
       });
     }
